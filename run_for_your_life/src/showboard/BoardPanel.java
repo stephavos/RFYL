@@ -1,0 +1,304 @@
+package showboard;
+
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Observable;
+import java.util.Observer;
+import javax.swing.JPanel;
+
+/**
+ * @author Sutibun
+ *
+ */
+class BoardPanel extends JPanel implements Observer {
+
+    private static final long   serialVersionUID = -3618605287900763008L;
+    private ISquare[][]         squares;
+    private final List<IPawn>   pawns;
+    private Dimension           dimension;
+    private Rectangle           displayFrame;
+    private final BufferedImage noImage;
+    private Boolean             widthLooped      = false;
+    private Boolean             heightLooped     = false;
+    
+    BoardPanel() {
+        super();
+        this.pawns = new ArrayList<>();
+        this.noImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        final Graphics2D graphics = this.noImage.createGraphics();
+        graphics.setColor(Color.darkGray);
+        graphics.fillRect(0, 0, 2, 2);
+    }
+
+    /* (non-Javadoc)
+     * @see javax.swing.JComponent#paintComponent(java.awt.Graphics)
+     */
+    @Override
+    public final void paintComponent(final Graphics graphics) {
+
+        final Map<String, ArrayList<IPawn>> mapPawn = this.createMapPawn();
+        for (int x = this.getCornerMinX(); x <= this.getCornerMaxX(); x++) {
+            for (int y = this.getCornerMinY(); y <= this.getCornerMaxY(); y++) {
+                this.drawSquareXY(graphics, x, y);
+                this.drawPawnsXY(graphics, mapPawn, x, y);
+            }
+        }
+    }
+    /* (non-Javadoc)
+     * @see java.util.Observer#update(java.util.Observable, java.lang.Object)
+     */
+    @Override
+    public final void update(final Observable observable, final Object object) {
+        this.repaint();
+    }
+
+    /**
+     * @param square
+     * @param x
+     * @param y
+     */
+    public final void addSquare(final ISquare square, final int x, final int y) {
+        this.squares[x][y] = square;
+    }
+
+    /**
+     * @param pawn
+     */
+    public final void addPawn(final IPawn pawn) {
+        this.getPawns().add(pawn);
+    }
+
+    /**
+     * @param x
+     * @param y
+     * @param widthLimit
+     * @param heightLimit
+     * @return
+     */
+    private Image getImageXY(final int x, final int y, final int widthLimit, final int heightLimit) {
+        Image image;
+        final int realX = this.calculateRealX(x);
+        final int realY = this.calculateRealY(y);
+        if ((realX < 0) || (realY < 0) || (realX >= widthLimit) || (realY >= heightLimit)) {
+            image = this.noImage;
+        } else {
+            image = this.squares[realX][realY].getImage();
+            if (image == null) {
+                image = this.noImage;
+            }
+        }
+        return image;
+    }
+
+    /**
+     * @param x
+     * @return
+     */
+    private int calculateRealX(final int x) {
+        if (!this.isWidthLooped()) {
+            return x;
+        }
+        return (x + this.getDimension().width) % this.getDimension().width;
+    }
+
+    /**
+     * @param y
+     * @return
+     */
+    private int calculateRealY(final int y) {
+        if (!this.isHeightLooped()) {
+            return y;
+        }
+        return (y + this.getDimension().height) % this.getDimension().height;
+    }
+
+    /**
+     * @return
+     */
+    private List<IPawn> getPawns() {
+        return this.pawns;
+    }
+
+    /**
+     * @return
+     */
+    public final Dimension getDimension() {
+        return this.dimension;
+    }
+
+    /**
+     * @param dimension
+     */
+    public final void setDimension(final Dimension dimension) {
+        this.dimension = dimension;
+        this.squares = new ISquare[this.getDimension().width][this.getDimension().height];
+    }
+
+    /**
+     * @return
+     */
+    public final Rectangle getDisplayFrame() {
+        return this.displayFrame;
+    }
+
+    /**
+     * @param displayFrame
+     */
+    public final void setDisplayFrame(final Rectangle displayFrame) {
+        this.displayFrame = displayFrame;
+    }
+
+    /**
+     * @return
+     */
+    public Boolean isWidthLooped() {
+        return this.widthLooped;
+    }
+
+    /**
+     * @param widthLooped
+     */
+    public void setWidthLooped(final Boolean widthLooped) {
+        this.widthLooped = widthLooped;
+    }
+
+    /**
+     * @return
+     */
+    public Boolean isHeightLooped() {
+        return this.heightLooped;
+    }
+
+    /**
+     * @param heightLooped
+     */
+    public void setHeightLooped(final Boolean heightLooped) {
+        this.heightLooped = heightLooped;
+    }
+
+    /**
+     * @return
+     */
+    private Map<String, ArrayList<IPawn>> createMapPawn() {
+        final Map<String, ArrayList<IPawn>> mapPawn = new HashMap<String, ArrayList<IPawn>>();
+        String key;
+
+        for (final IPawn pawn : this.getPawns()) {
+            key = this.createMapPawnKey(pawn.getX(), pawn.getY());
+            ArrayList<IPawn> listPawn = mapPawn.get(key);
+            if (listPawn == null) {
+                listPawn = new ArrayList<IPawn>();
+                mapPawn.put(key, listPawn);
+            }
+            listPawn.add(pawn);
+        }
+        return mapPawn;
+    }
+
+    /**
+     * @param x
+     * @param y
+     * @return
+     */
+    private String createMapPawnKey(final int x, final int y) {
+        return x + ":" + y;
+    }
+
+    /**
+     * @param graphics
+     * @param x
+     * @param y
+     */
+    private void drawSquareXY(final Graphics graphics, final int x, final int y) {
+        Image image;
+        image = this.getImageXY(x, y, this.getWidthLimit(), this.getHeightLimit());
+        graphics.drawImage(image, this.getSquareSizeWidth() * (x - this.getCornerMinX()),
+                this.getSquareSizeHeight() * (y - this.getCornerMinY()), this.getSquareSizeWidth(),
+                this.getSquareSizeHeight(), this);
+
+    }
+
+    /**
+     * @param graphics
+     * @param mapPawn
+     * @param x
+     * @param y
+     */
+    private void drawPawnsXY(final Graphics graphics, final Map<String, ArrayList<IPawn>> mapPawn, final int x,
+            final int y) {
+        final List<IPawn> listPawn = mapPawn.get(this.createMapPawnKey(this.calculateRealX(x), this.calculateRealY(y)));
+        if (listPawn != null) {
+            for (final IPawn pawn : listPawn) {
+                graphics.drawImage(pawn.getImage(), this.getSquareSizeWidth() * (x - this.getCornerMinX()),
+                        this.getSquareSizeHeight() * (y - this.getCornerMinY()), this.getSquareSizeWidth(),
+                        this.getSquareSizeHeight(), this);
+            }
+        }
+    }
+
+    /**
+     * @return
+     */
+    private int getWidthLimit() {
+        return Math.min(this.getDisplayFrame().width + this.getDisplayFrame().x, this.getDimension().width);
+    }
+
+    /**
+     * @return
+     */
+    private int getHeightLimit() {
+        return Math.min(this.getDisplayFrame().height + this.getDisplayFrame().y, this.getDimension().height);
+    }
+
+    /**
+     * @return
+     */
+    private int getCornerMinX() {
+        return this.getDisplayFrame().x;
+    }
+
+    /**
+     * @return
+     */
+    private int getCornerMaxX() {
+        return this.getDisplayFrame().x + this.getDisplayFrame().width;
+    }
+
+    /**
+     * @return
+     */
+    private int getCornerMinY() {
+        return this.getDisplayFrame().y;
+    }
+
+    /**
+     * @return
+     */
+    private int getCornerMaxY() {
+        return this.getDisplayFrame().y + this.getDisplayFrame().height;
+    }
+
+    /**
+     * @return
+     */
+    private int getSquareSizeWidth() {
+        return this.getWidth() / this.getDisplayFrame().width;
+    }
+
+    /**
+     * @return
+     */
+    private int getSquareSizeHeight() {
+        return this.getHeight() / this.getDisplayFrame().height;
+    }
+
+}
